@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Notas — árbol de notas</title>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #202a35;
+      background: #f4f6f8;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --border: #d7dee6;
+      --muted: #64748b;
+      --primary: #245c9c;
+      --primary-hover: #194879;
+      --surface: #fff;
+      --selected: #e7f0fb;
+      --focus: #3978be;
+      --header-height: auto;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    body,
+    button,
+    textarea,
+    input {
+      font: inherit;
+    }
+
+    button {
+      min-height: 40px;
+      padding: 0.55rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 0.45rem;
+      color: #243244;
+      background: var(--surface);
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f0f4f8;
+    }
+
+    button:focus-visible,
+    textarea:focus-visible,
+    input:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent);
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      min-width: 0;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      z-index: 3;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin-right: auto;
+      min-width: max-content;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      line-height: 1.3;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 2rem;
+      height: 2rem;
+      place-items: center;
+      border-radius: 0.5rem;
+      color: white;
+      background: var(--primary);
+      font-weight: 700;
+    }
+
+    .header-actions,
+    .tree-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .button-primary {
+      border-color: var(--primary);
+      color: white;
+      background: var(--primary);
+    }
+
+    .button-primary:hover:not(:disabled) {
+      color: white;
+      background: var(--primary-hover);
+    }
+
+    .status {
+      min-width: max-content;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+
+    .status.is-dirty {
+      color: #9a4e00;
+      font-weight: 600;
+    }
+
+    .menu-button {
+      display: none;
+    }
+
+    .workspace {
+      position: relative;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .tree-toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      padding: 0.8rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tree-toolbar h2 {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .tree-actions button {
+      flex: 1 1 auto;
+    }
+
+    .tree-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 0.55rem;
+      overscroll-behavior: contain;
+    }
+
+    .tree-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .tree-item {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 0.15rem;
+      min-width: 0;
+      padding-left: calc(var(--depth) * 0.95rem);
+    }
+
+    .tree-toggle,
+    .tree-spacer {
+      flex: 0 0 2rem;
+      width: 2rem;
+      min-height: 36px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .tree-spacer {
+      display: inline-block;
+    }
+
+    .tree-title {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 36px;
+      overflow: hidden;
+      padding: 0.4rem 0.55rem;
+      border-color: transparent;
+      text-align: left;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tree-title.is-selected {
+      border-color: #b7cde5;
+      color: #163f6b;
+      background: var(--selected);
+      font-weight: 600;
+    }
+
+    .tree-children {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .empty-tree {
+      padding: 0.85rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .editor {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      padding: clamp(0.8rem, 2vw, 1.5rem);
+      background: #f8fafc;
+    }
+
+    .editor-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      min-width: 0;
+      margin-bottom: 0.8rem;
+    }
+
+    .editor-heading h2 {
+      overflow: hidden;
+      margin: 0;
+      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .editor-hint {
+      margin: 0 0 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .editor-text {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
+      resize: none;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 0.55rem;
+      color: #202a35;
+      background: var(--surface);
+      line-height: 1.6;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .editor-text:disabled {
+      background: #f1f4f7;
+      cursor: not-allowed;
+    }
+
+    .welcome-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 1rem;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+    }
+
+    dialog {
+      width: min(92vw, 420px);
+      padding: 1.2rem;
+      border: 1px solid var(--border);
+      border-radius: 0.7rem;
+      color: inherit;
+      box-shadow: 0 16px 48px rgb(15 23 42 / 20%);
+    }
+
+    dialog::backdrop {
+      background: rgb(15 23 42 / 45%);
+    }
+
+    dialog h2 {
+      margin: 0 0 0.8rem;
+      font-size: 1.1rem;
+    }
+
+    dialog label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-weight: 600;
+    }
+
+    dialog input {
+      width: 100%;
+      min-height: 42px;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.55rem;
+      margin-top: 1rem;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 760px) {
+      .app-header {
+        gap: 0.55rem;
+        padding: 0.55rem 0.7rem;
+      }
+
+      .brand {
+        margin-right: 0;
+      }
+
+      .brand h1 {
+        font-size: 1rem;
+      }
+
+      .menu-button {
+        display: inline-block;
+      }
+
+      .header-actions {
+        order: 3;
+        width: 100%;
+      }
+
+      .header-actions button {
+        flex: 1 1 auto;
+      }
+
+      .status {
+        margin-left: auto;
+        font-size: 0.8rem;
+      }
+
+      .workspace {
+        display: block;
+        min-height: 0;
+      }
+
+      .sidebar {
+        position: absolute;
+        z-index: 2;
+        inset: 0 auto 0 0;
+        width: min(86vw, 320px);
+        border-right: 1px solid var(--border);
+        box-shadow: 8px 0 24px rgb(15 23 42 / 12%);
+        transform: translateX(-105%);
+        visibility: hidden;
+        transition: transform 160ms ease, visibility 160ms ease;
+      }
+
+      .sidebar.is-open {
+        transform: translateX(0);
+        visibility: visible;
+      }
+
+      .sidebar-backdrop.is-visible {
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: rgb(15 23 42 / 32%);
+      }
+
+      .editor {
+        width: 100%;
+        height: 100%;
+        padding: 0.8rem;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .header-actions {
+        gap: 0.35rem;
+      }
+
+      .header-actions button {
+        padding-inline: 0.5rem;
+        font-size: 0.88rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <button
+        class="menu-button"
+        id="menuButton"
+        type="button"
+        aria-label="Abrir árbol de notas"
+        aria-controls="sidebar"
+        aria-expanded="false"
+      >☰</button>
+
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <h1>Notas</h1>
+      </div>
+
+      <div class="header-actions" aria-label="Acciones del documento">
+        <button id="addNodeButton" class="button-primary" type="button">Añadir Nodo</button>
+        <button id="addChildButton" type="button" disabled>Añadir Subnodo</button>
+        <button id="renameButton" type="button" disabled>Renombrar</button>
+        <button id="deleteButton" type="button" disabled>Eliminar</button>
+        <button id="saveButton" type="button">Grabar XML</button>
+        <button id="loadButton" type="button">Cargar XML</button>
+      </div>
+
+      <span id="documentStatus" class="status" role="status" aria-live="polite">
+        Sin cambios pendientes
+      </span>
+
+      <input
+        id="fileInput"
+        class="visually-hidden"
+        type="file"
+        accept=".xml,text/xml,application/xml"
+        tabindex="-1"
+        aria-label="Seleccionar archivo XML"
+      >
+    </header>
+
+    <main class="workspace">
+      <aside id="sidebar" class="sidebar" aria-label="Árbol de notas">
+        <div class="tree-toolbar">
+          <h2>Árbol de notas</h2>
+          <div class="tree-actions">
+            <button id="treeAddNodeButton" type="button">Añadir Nodo</button>
+            <button id="treeAddChildButton" type="button" disabled>Añadir Subnodo</button>
+          </div>
+        </div>
+        <nav id="treeScroll" class="tree-scroll" aria-label="Notas">
+          <ul id="treeRoot" class="tree-list"></ul>
+          <p id="emptyTreeMessage" class="empty-tree">
+            Aún no hay notas. Añade un nodo o carga un archivo XML.
+          </p>
+        </nav>
+      </aside>
+
+      <button
+        id="sidebarBackdrop"
+        class="sidebar-backdrop"
+        type="button"
+        aria-label="Cerrar árbol de notas"
+        tabindex="-1"
+      ></button>
+
+      <section class="editor" aria-label="Editor de notas">
+        <div class="editor-heading">
+          <h2 id="editorTitle">Sin selección</h2>
+          <span id="editorStatus" class="status" aria-live="polite">—</span>
+        </div>
+
+        <p id="welcomeMessage" class="editor-hint">
+          Abre un archivo XML existente o empieza con un árbol vacío creando una nota.
+        </p>
+
+        <div id="welcomeActions" class="welcome-actions">
+          <button id="welcomeLoadButton" class="button-primary" type="button">Cargar XML</button>
+          <button id="welcomeCreateButton" type="button">Crear primera nota</button>
+        </div>
+
+        <label class="visually-hidden" for="noteContent">Contenido de la nota</label>
+        <textarea
+          id="noteContent"
+          class="editor-text"
+          placeholder="Selecciona una nota para editar su contenido."
+          disabled
+          spellcheck="true"
+        ></textarea>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="titleDialog" aria-labelledby="dialogTitle">
+    <form id="titleForm">
+      <h2 id="dialogTitle">Título de la nota</h2>
+      <label for="titleInput">Título</label>
+      <input id="titleInput" name="title" type="text" autocomplete="off">
+      <div class="dialog-actions">
+        <button id="cancelTitleButton" type="button">Cancelar</button>
+        <button class="button-primary" type="submit">Aceptar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      // Modelo y estado de la aplicación.
+      const state = {
+        roots: [],
+        selectedId: null,
+        isDirty: false,
+        titleDialogAction: null
+      };
+
+      const elements = {
+        addNodeButton: document.getElementById("addNodeButton"),
+        addChildButton: document.getElementById("addChildButton"),
+        renameButton: document.getElementById("renameButton"),
+        deleteButton: document.getElementById("deleteButton"),
+        saveButton: document.getElementById("saveButton"),
+        loadButton: document.getElementById("loadButton"),
+        fileInput: document.getElementById("fileInput"),
+        documentStatus: document.getElementById("documentStatus"),
+        editorStatus: document.getElementById("editorStatus"),
+        editorTitle: document.getElementById("editorTitle"),
+        noteContent: document.getElementById("noteContent"),
+        welcomeMessage: document.getElementById("welcomeMessage"),
+        welcomeActions: document.getElementById("welcomeActions"),
+        welcomeLoadButton: document.getElementById("welcomeLoadButton"),
+        welcomeCreateButton: document.getElementById("welcomeCreateButton"),
+        treeRoot: document.getElementById("treeRoot"),
+        treeScroll: document.getElementById("treeScroll"),
+        emptyTreeMessage: document.getElementById("emptyTreeMessage"),
+        treeAddNodeButton: document.getElementById("treeAddNodeButton"),
+        treeAddChildButton: document.getElementById("treeAddChildButton"),
+        sidebar: document.getElementById("sidebar"),
+        menuButton: document.getElementById("menuButton"),
+        sidebarBackdrop: document.getElementById("sidebarBackdrop"),
+        titleDialog: document.getElementById("titleDialog"),
+        titleForm: document.getElementById("titleForm"),
+        titleDialogHeading: document.getElementById("dialogTitle"),
+        titleInput: document.getElementById("titleInput"),
+        cancelTitleButton: document.getElementById("cancelTitleButton")
+      };
+
+      // Gestión del árbol y referencias por ID.
+      function findLocation(nodes, id, parent = null) {
+        for (let index = 0; index < nodes.length; index += 1) {
+          const node = nodes[index];
+          if (node.id === id) {
+            return { node, parent, siblings: nodes, index };
+          }
+
+          const childLocation = findLocation(node.children, id, node);
+          if (childLocation) {
+            return childLocation;
+          }
+        }
+        return null;
+      }
+
+      function getSelectedLocation() {
+        return state.selectedId ? findLocation(state.roots, state.selectedId) : null;
+      }
+
+      function createUniqueId(usedIds = new Set()) {
+        let id;
+
+        do {
+          if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+            id = globalThis.crypto.randomUUID();
+          } else {
+            id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+          }
+        } while (usedIds.has(id));
+
+        usedIds.add(id);
+        return id;
+      }
+
+      function createNode(title, usedIds) {
+        return {
+          id: createUniqueId(usedIds),
+          title,
+          content: "",
+          children: [],
+          expanded: true
+        };
+      }
+
+      function collectIds(nodes, ids = new Set()) {
+        for (const node of nodes) {
+          ids.add(node.id);
+          collectIds(node.children, ids);
+        }
+        return ids;
+      }
+
+      function updateActionAvailability() {
+        const hasSelection = Boolean(getSelectedLocation());
+        elements.addChildButton.disabled = !hasSelection;
+        elements.treeAddChildButton.disabled = !hasSelection;
+        elements.renameButton.disabled = !hasSelection;
+        elements.deleteButton.disabled = !hasSelection;
+      }
+
+      function updateDocumentStatus() {
+        const message = state.isDirty ? "Cambios sin guardar" : "Sin cambios pendientes";
+        elements.documentStatus.textContent = message;
+        elements.editorStatus.textContent = state.isDirty ? "Modificado" : "Guardado";
+        elements.documentStatus.classList.toggle("is-dirty", state.isDirty);
+        elements.editorStatus.classList.toggle("is-dirty", state.isDirty);
+      }
+
+      function markDirty() {
+        state.isDirty = true;
+        updateDocumentStatus();
+      }
+
+      function markClean() {
+        state.isDirty = false;
+        updateDocumentStatus();
+      }
+
+      // Renderizado seguro: los títulos se insertan únicamente como texto.
+      function createTreeItem(node, depth) {
+        const item = document.createElement("li");
+        item.className = "tree-item";
+
+        const row = document.createElement("div");
+        row.className = "tree-row";
+        row.style.setProperty("--depth", String(depth));
+
+        if (node.children.length > 0) {
+          const toggle = document.createElement("button");
+          toggle.className = "tree-toggle";
+          toggle.type = "button";
+          toggle.textContent = node.expanded ? "▾" : "▸";
+          toggle.setAttribute("aria-label", node.expanded ? "Contraer rama" : "Expandir rama");
+          toggle.setAttribute("aria-expanded", String(node.expanded));
+          toggle.addEventListener("click", () => {
+            node.expanded = !node.expanded;
+            renderTree();
+          });
+          row.append(toggle);
+        } else {
+          const spacer = document.createElement("span");
+          spacer.className = "tree-spacer";
+          spacer.setAttribute("aria-hidden", "true");
+          row.append(spacer);
+        }
+
+        const titleButton = document.createElement("button");
+        titleButton.className = "tree-title";
+        titleButton.type = "button";
+        titleButton.textContent = node.title || "(Sin título)";
+        titleButton.dataset.nodeId = node.id;
+        titleButton.setAttribute("aria-current", node.id === state.selectedId ? "true" : "false");
+
+        if (node.id === state.selectedId) {
+          titleButton.classList.add("is-selected");
+        }
+
+        titleButton.addEventListener("click", () => selectNode(node.id, true));
+        row.append(titleButton);
+        item.append(row);
+
+        if (node.children.length > 0) {
+          const children = document.createElement("ul");
+          children.className = "tree-children";
+          children.hidden = !node.expanded;
+
+          for (const child of node.children) {
+            children.append(createTreeItem(child, depth + 1));
+          }
+          item.append(children);
+        }
+
+        return item;
+      }
+
+      function renderTree(ensureSelectionVisible = false) {
+        const previousScrollTop = elements.treeScroll.scrollTop;
+        elements.treeRoot.replaceChildren();
+
+        for (const root of state.roots) {
+          elements.treeRoot.append(createTreeItem(root, 0));
+        }
+
+        elements.emptyTreeMessage.hidden = state.roots.length > 0;
+        updateActionAvailability();
+
+        if (!ensureSelectionVisible) {
+          elements.treeScroll.scrollTop = previousScrollTop;
+        } else if (state.selectedId) {
+          const selectedButton = Array.from(
+            elements.treeRoot.querySelectorAll(".tree-title")
+          ).find((button) => button.dataset.nodeId === state.selectedId);
+
+          if (selectedButton) {
+            selectedButton.scrollIntoView({ block: "nearest" });
+          }
+        }
+      }
+
+      function updateEditorForSelection() {
+        const location = getSelectedLocation();
+        const hasSelection = Boolean(location);
+
+        elements.noteContent.disabled = !hasSelection;
+        elements.noteContent.value = hasSelection ? location.node.content : "";
+        elements.editorTitle.textContent = hasSelection
+          ? (location.node.title || "(Sin título)")
+          : "Sin selección";
+        elements.welcomeMessage.hidden = hasSelection;
+        elements.welcomeActions.hidden = hasSelection;
+        elements.noteContent.placeholder = hasSelection
+          ? "Escribe el contenido de esta nota."
+          : "Selecciona una nota para editar su contenido.";
+      }
+
+      function closeSidebarOnMobile() {
+        if (window.matchMedia("(max-width: 760px)").matches) {
+          setSidebarOpen(false);
+        }
+      }
+
+      function selectNode(id, closeMobileSidebar = false) {
+        const location = findLocation(state.roots, id);
+        if (!location) {
+          return;
+        }
+
+        state.selectedId = location.node.id;
+        updateEditorForSelection();
+        renderTree(true);
+
+        if (closeMobileSidebar) {
+          closeSidebarOnMobile();
+        }
+      }
+
+      // Creación, renombrado y eliminación de notas.
+      function openTitleDialog(action, initialTitle = "") {
+        state.titleDialogAction = action;
+        elements.titleDialogHeading.textContent =
+          action.type === "rename" ? "Renombrar nota" : "Crear nota";
+        elements.titleInput.value = initialTitle;
+        elements.titleDialog.showModal();
+        elements.titleInput.focus();
+        elements.titleInput.select();
+      }
+
+      function addNode(title) {
+        const usedIds = collectIds(state.roots);
+        const newNode = createNode(title, usedIds);
+        const selected = getSelectedLocation();
+
+        if (selected) {
+          selected.siblings.splice(selected.index + 1, 0, newNode);
+        } else {
+          state.roots.push(newNode);
+        }
+
+        state.selectedId = newNode.id;
+        markDirty();
+        updateEditorForSelection();
+        renderTree(true);
+      }
+
+      function addSubnode(title) {
+        const selected = getSelectedLocation();
+        if (!selected) {
+          window.alert("Primero debes seleccionar una nota.");
+          return;
+        }
+
+        const newNode = createNode(title, collectIds(state.roots));
+        selected.node.children.push(newNode);
+        selected.node.expanded = true;
+
+        state.selectedId = newNode.id;
+        markDirty();
+        updateEditorForSelection();
+        renderTree(true);
+      }
+
+      function renameSelectedNode(title) {
+        const selected = getSelectedLocation();
+        if (!selected) {
+          return;
+        }
+
+        selected.node.title = title;
+        markDirty();
+        updateEditorForSelection();
+        renderTree(true);
+      }
+
+      function deleteSelectedNode() {
+        const selected = getSelectedLocation();
+        if (!selected) {
+          return;
+        }
+
+        const descendantCount = countNodes(selected.node) - 1;
+        const detail = descendantCount > 0
+          ? ` También se eliminarán sus ${descendantCount} subnodo(s) y descendiente(s).`
+          : "";
+
+        if (!window.confirm(`¿Eliminar «${selected.node.title || "(Sin título)"}»?${detail}`)) {
+          return;
+        }
+
+        selected.siblings.splice(selected.index, 1);
+
+        if (selected.siblings.length > 0) {
+          const nearestIndex = Math.min(selected.index, selected.siblings.length - 1);
+          state.selectedId = selected.siblings[nearestIndex].id;
+        } else if (selected.parent) {
+          state.selectedId = selected.parent.id;
+        } else {
+          state.selectedId = null;
+        }
+
+        markDirty();
+        updateEditorForSelection();
+        renderTree(true);
+      }
+
+      function countNodes(node) {
+        return 1 + node.children.reduce((total, child) => total + countNodes(child), 0);
+      }
+
+      // Edición de contenido: el modelo se actualiza antes de cambiar de selección.
+      elements.noteContent.addEventListener("input", () => {
+        const selected = getSelectedLocation();
+        if (!selected) {
+          return;
+        }
+
+        selected.node.content = elements.noteContent.value;
+        markDirty();
+      });
+
+      // Importación y validación XML.
+      function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.addEventListener("load", () => {
+            if (typeof reader.result !== "string") {
+              reject(new Error("El archivo no se pudo leer como texto."));
+              return;
+            }
+            resolve(reader.result);
+          });
+
+          reader.addEventListener("error", () => {
+            reject(new Error(reader.error?.message || "Error al leer el archivo."));
+          });
+
+          reader.addEventListener("abort", () => {
+            reject(new Error("La lectura del archivo fue cancelada."));
+          });
+
+          reader.readAsText(file);
+        });
+      }
+
+      function assertAllowedAttributes(element, allowedNames) {
+        for (const attribute of Array.from(element.attributes)) {
+          if (!allowedNames.includes(attribute.name)) {
+            throw new Error(`Atributo no admitido «${attribute.name}» en <${element.tagName}>.`);
+          }
+        }
+      }
+
+      function getElementChildrenStrict(element) {
+        const result = [];
+
+        for (const child of Array.from(element.childNodes)) {
+          if (child.nodeType === Node.ELEMENT_NODE) {
+            result.push(child);
+          } else if (
+            child.nodeType === Node.TEXT_NODE &&
+            child.nodeValue.trim() === ""
+          ) {
+            // Se permite el espacio en blanco de formato entre elementos.
+          } else if (child.nodeType === Node.COMMENT_NODE) {
+            // Los comentarios XML no forman parte del modelo.
+          } else {
+            throw new Error(`Contenido inesperado dentro de <${element.tagName}>.`);
+          }
+        }
+
+        return result;
+      }
+
+      function parseXmlNode(element, usedIds) {
+        if (element.tagName !== "node") {
+          throw new Error(`Se esperaba <node>, pero se encontró <${element.tagName}>.`);
+        }
+
+        assertAllowedAttributes(element, ["title"]);
+        if (!element.hasAttribute("title")) {
+          throw new Error("Un elemento <node> no contiene el atributo title.");
+        }
+
+        const childElements = getElementChildrenStrict(element);
+        let content = "";
+        let contentSeen = false;
+        const children = [];
+
+        for (const child of childElements) {
+          if (child.tagName === "content") {
+            if (contentSeen) {
+              throw new Error("Un nodo contiene más de un elemento <content>.");
+            }
+
+            assertAllowedAttributes(child, []);
+            if (Array.from(child.childNodes).some((item) => item.nodeType === Node.ELEMENT_NODE)) {
+              throw new Error("El contenido de una nota debe ser texto, no elementos XML anidados.");
+            }
+
+            content = child.textContent;
+            contentSeen = true;
+          } else if (child.tagName === "node") {
+            children.push(parseXmlNode(child, usedIds));
+          } else {
+            throw new Error(`Elemento no admitido <${child.tagName}> dentro de <node>.`);
+          }
+        }
+
+        return {
+          id: createUniqueId(usedIds),
+          title: element.getAttribute("title"),
+          content,
+          children,
+          expanded: true
+        };
+      }
+
+      function parseNotesXml(xmlText) {
+        if (/<!DOCTYPE\b/i.test(xmlText)) {
+          throw new Error("No se admiten declaraciones DOCTYPE en el archivo XML.");
+        }
+
+        const document = new DOMParser().parseFromString(xmlText, "application/xml");
+        const parserErrors = document.getElementsByTagName("parsererror");
+
+        if (parserErrors.length > 0 || !document.documentElement) {
+          throw new Error("El archivo está vacío o contiene XML mal formado.");
+        }
+
+        if (document.doctype) {
+          throw new Error("No se admiten declaraciones DOCTYPE en el archivo XML.");
+        }
+
+        const root = document.documentElement;
+        if (root.tagName !== "cherrytree_notes") {
+          throw new Error("La raíz del XML debe ser <cherrytree_notes>.");
+        }
+
+        assertAllowedAttributes(root, []);
+        const usedIds = new Set();
+        const importedRoots = [];
+
+        for (const child of getElementChildrenStrict(root)) {
+          if (child.tagName !== "node") {
+            throw new Error(`Elemento no admitido <${child.tagName}> bajo la raíz XML.`);
+          }
+          importedRoots.push(parseXmlNode(child, usedIds));
+        }
+
+        return importedRoots;
+      }
+
+      async function handleFileSelection(event) {
+        const file = event.target.files?.[0];
+        if (!file) {
+          return;
+        }
+
+        try {
+          const xmlText = await readFileAsText(file);
+          const importedRoots = parseNotesXml(xmlText);
+
+          if (state.isDirty && !window.confirm(
+            "Hay cambios sin guardar. ¿Quieres sustituir el documento actual por el XML seleccionado?"
+          )) {
+            return;
+          }
+
+          state.roots = importedRoots;
+          state.selectedId = importedRoots.length > 0 ? importedRoots[0].id : null;
+          markClean();
+          updateEditorForSelection();
+          renderTree(true);
+        } catch (error) {
+          window.alert(`No se pudo cargar el archivo XML: ${error.message}`);
+        } finally {
+          // Permite volver a seleccionar el mismo archivo.
+          elements.fileInput.value = "";
+        }
+      }
+
+      // Exportación XML y descarga mediante Blob.
+      function appendXmlNode(document, parent, node) {
+        const xmlNode = document.createElement("node");
+        xmlNode.setAttribute("title", node.title);
+
+        const content = document.createElement("content");
+        content.appendChild(document.createTextNode(node.content));
+        xmlNode.appendChild(content);
+
+        for (const child of node.children) {
+          appendXmlNode(document, xmlNode, child);
+        }
+
+        parent.appendChild(xmlNode);
+      }
+
+      function serializeNotesXml() {
+  const xmlDocument = document.implementation.createDocument(
+    null,
+    "cherrytree_notes"
+  );
+  const root = xmlDocument.documentElement;
+
+  for (const node of state.roots) {
+    appendXmlNode(xmlDocument, root, node);
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(xmlDocument)}`;
+}
+
+      function exportXml() {
+        let objectUrl;
+
+        try {
+          const xml = serializeNotesXml();
+          const blob = new Blob([xml], { type: "application/xml;charset=utf-8" });
+          objectUrl = URL.createObjectURL(blob);
+
+          const link = document.createElement("a");
+          link.href = objectUrl;
+          link.download = "notas.xml";
+          link.style.display = "none";
+          document.body.append(link);
+          link.click();
+          link.remove();
+
+          // El navegador inicia la descarga, pero no confirma la ruta ni el guardado final.
+          markClean();
+          window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+          window.alert("Descarga de notas.xml iniciada. Confirma en el navegador que el archivo se haya guardado.");
+        } catch (error) {
+          if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+          }
+          window.alert(`No se pudo iniciar la exportación XML: ${error.message}`);
+        }
+      }
+
+      // Panel móvil y eventos de interfaz.
+      function setSidebarOpen(isOpen) {
+        elements.sidebar.classList.toggle("is-open", isOpen);
+        elements.sidebarBackdrop.classList.toggle("is-visible", isOpen);
+        elements.menuButton.setAttribute("aria-expanded", String(isOpen));
+        elements.menuButton.setAttribute(
+          "aria-label",
+          isOpen ? "Cerrar árbol de notas" : "Abrir árbol de notas"
+        );
+      }
+
+      function requestFileLoad() {
+        elements.fileInput.click();
+      }
+
+      elements.addNodeButton.addEventListener("click", () => {
+        openTitleDialog({ type: "add-node" });
+      });
+
+      elements.treeAddNodeButton.addEventListener("click", () => {
+        openTitleDialog({ type: "add-node" });
+      });
+
+      elements.addChildButton.addEventListener("click", () => {
+        if (getSelectedLocation()) {
+          openTitleDialog({ type: "add-child" });
+        } else {
+          window.alert("Primero debes seleccionar una nota.");
+        }
+      });
+
+      elements.treeAddChildButton.addEventListener("click", () => {
+        if (getSelectedLocation()) {
+          openTitleDialog({ type: "add-child" });
+        } else {
+          window.alert("Primero debes seleccionar una nota.");
+        }
+      });
+
+      elements.renameButton.addEventListener("click", () => {
+        const selected = getSelectedLocation();
+        if (selected) {
+          openTitleDialog({ type: "rename" }, selected.node.title);
+        }
+      });
+
+      elements.deleteButton.addEventListener("click", deleteSelectedNode);
+      elements.saveButton.addEventListener("click", exportXml);
+      elements.loadButton.addEventListener("click", requestFileLoad);
+      elements.welcomeLoadButton.addEventListener("click", requestFileLoad);
+      elements.welcomeCreateButton.addEventListener("click", () => {
+        openTitleDialog({ type: "add-node" });
+      });
+      elements.fileInput.addEventListener("change", handleFileSelection);
+
+      elements.titleForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const action = state.titleDialogAction;
+        const title = elements.titleInput.value;
+        elements.titleDialog.close();
+        state.titleDialogAction = null;
+
+        if (!action) {
+          return;
+        }
+
+        if (action.type === "add-node") {
+          addNode(title);
+        } else if (action.type === "add-child") {
+          addSubnode(title);
+        } else if (action.type === "rename") {
+          renameSelectedNode(title);
+        }
+      });
+
+      elements.cancelTitleButton.addEventListener("click", () => {
+        state.titleDialogAction = null;
+        elements.titleDialog.close();
+      });
+
+      elements.titleDialog.addEventListener("cancel", () => {
+        state.titleDialogAction = null;
+      });
+
+      elements.menuButton.addEventListener("click", () => {
+        setSidebarOpen(!elements.sidebar.classList.contains("is-open"));
+      });
+
+      elements.sidebarBackdrop.addEventListener("click", () => {
+        setSidebarOpen(false);
+      });
+
+      window.addEventListener("beforeunload", (event) => {
+        if (!state.isDirty) {
+          return;
+        }
+
+        event.preventDefault();
+        event.returnValue = "";
+      });
+
+      // Estado inicial: documento vacío listo para cargar o empezar.
+      renderTree();
+      updateEditorForSelection();
+      updateDocumentStatus();
+    })();
+  </script>
+</body>
+</html>
